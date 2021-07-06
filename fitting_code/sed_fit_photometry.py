@@ -20,7 +20,7 @@ CALLING SEQUENCE:
 INPUTS:
           target: The name of the target, to be used in the output files.
     master_table: Catalog file.
-               z: Redshift of the source.
+        REDSHIFT: Redshift of the source.
       x0,y0,size: x and y coordinates, and size of the output cutouts.
           mw_ebv: Milky Way extinction E(B-V) from the source.
   ha_line_filter: Narrow-band filter that targets H-alpha.
@@ -32,11 +32,10 @@ OUTPUTS:
               mt: Catalog file updated with output parameters from the fit.
 
 PROCEDURES USED:
-          FIT_PHOTOMETRY    -- Main program to perform the SED-fit and subtract
-                               the continuum to obtain line fluxes.
-          RGB_IMAGE          -- Apply 2D bins to a new image.
-          SINGLE_PIXEL_TABLE -- Create a table for the individual pixels.
-          APPLY_BINNING      -- Use bin_image to bin other filter images of the target.
+          FIT_PHOTOMETRY     -- Main program to perform the SED-fit and subtract
+                                the continuum to obtain line fluxes.
+          RGB_IMAGE          -- Obtain RGB image of the target.
+     _INTEGRATE_TEMPFILT     -- Integrate template through a filter. From eazy-py.
 """
 
 
@@ -61,7 +60,24 @@ from grizli import utils
 
 #----------------------------------------------------------------------------
 
-def rgb_image(target='galaxy',file_name='galaxy*.fits',blue_f='f435w',green_f='f814w',red_f='f110w'):
+def rgb_image(target='galaxy',file_name='galaxy*.fits',blue_f='f435w',green_f='f814w',red_f='f110w',plot=False):
+      
+    """
+    Function that creates an RGB image of an input target.
+    
+    INPUTS:
+        target: The name of the target, to be used in the output files.
+     file_name: General form of the file names that contain the RGB filter images.
+        blue_f: Filter in the blue band.
+       green_f: Filter in the green band.
+         red_f: Filter in the red band.
+                 
+    KEYWORDS:
+          PLOT: Set this keyword to produce a plot of the two-dimensional
+                RGB image.   
+    OUTPUTS:
+          Fits file with the RGB image.
+    """
        
     import numpy as np
     import matplotlib.pyplot as plt
@@ -90,11 +106,30 @@ def rgb_image(target='galaxy',file_name='galaxy*.fits',blue_f='f435w',green_f='f
     green = images[green_f]*headers[green_f]['IM2FLAM']/1.e-19
     red = images[red_f]*headers[red_f]['IM2FLAM']/1.e-19
     rgb = lupton_rgb.make_lupton_rgb(red, green, blue, minimum=-0.1, stretch=1, Q=8)
+
+    if plot:
+        fig = plt.figure(figsize=[6,6])
+        ax = fig.add_subplot(111)
+        imsh = ax.imshow(rgb, origin='lower')
+      
     return rgb
 
  #----------------------------------------------------------------------------
 
 def _integrate_tempfilt(itemp, templ, self, REDSHIFT):
+      
+    """
+    Function for integrating templates through filters. From eazy-py/photoz.
+    
+    INPUTS:
+         itemp: Index of the template.
+         templ: Template to integrate.
+          self: Self object from eazy-py (eazy.photoz.PhotoZ object).
+      REDSHIFT: Redshift of the source.
+                 
+    OUTPUTS:
+          Synthetic photometry of the template integrated through the filter.
+    """
 
     import eazy.utils as eazyutils
     
@@ -134,16 +169,33 @@ def _integrate_tempfilt(itemp, templ, self, REDSHIFT):
 
 #----------------------------------------------------------------------------
 
-def fit_photometry(target,master_table,REDSHIFT,x0,y0,size,mw_ebv,ha_line_filter,pab_line_filter,path,f,test=True):
-   # target = str(f[0])
-   # REDSHIFT = float(f[3])
-   # x0,y0,size = [int(f[8]),int(f[9]),int(f[7])]
+def fit_photometry(target,master_table,REDSHIFT,x0,y0,size,mw_ebv,ha_line_filter,pab_line_filter,plot=True):
+      
+ """
+      Function fitting spatially-resolved photometry with a set of SED templates. 
+      Can extract line fluxes from narrow-band imaging, by robustly fitting and 
+      subtracting the continuum. Outputs physical properties such as the stellar 
+      mass, star formation rate and visual extinction Av.
+    
+      INPUTS:
+          target: The name of the target, to be used in the output files.
+    master_table: Catalog file.
+        REDSHIFT: Redshift of the source.
+      x0,y0,size: x and y coordinates, and size of the output cutouts.
+          mw_ebv: Milky Way extinction E(B-V) from the source.
+  ha_line_filter: Narrow-band filter that targets H-alpha.
+ pab_line_filter: Narrow-band filter that targets Paschen-beta.
+      KEYWORDS:
+            PLOT: Set this keyword to produce multiple plots of the
+                  output parameters and cutouts of the target.
+      OUTPUTS:
+              mt: Catalog file updated with output parameters from the fit.
+ """
+
     slx = slice(x0-size, x0+size)
     sly = slice(y0-size, y0+size)
-  #  mw_ebv = float(f[10])
-  #  blue_f,green_f,red_f = [str(f[4]),str(f[5]),str(f[6])]
-    file_name='{0}binned_{1}_f*image.fits'.format(path,target)
-    master_table = '{0}binned_{1}_master_table.fits'.format(path,target)
+   # file_name='{0}binned_{1}_f*image.fits'.format(path,target)
+   # master_table = '{0}binned_{1}_master_table.fits'.format(path,target)
     mt = Table.read(master_table) 
     
     template_files = """templates/spline_templates_v3/fsps_alpha_bin0_Av0.0.fits
@@ -508,7 +560,7 @@ def fit_photometry(target,master_table,REDSHIFT,x0,y0,size,mw_ebv,ha_line_filter
     mt.write('fit_output/{0}_master_table.fits'.format(target), overwrite=True)
 
         ### PLOT RESULTS
-    if True:
+    if plot:
         rgb = rgb_image(target,file_name,blue_f,green_f,red_f)     
         fig, ((ax1,ax2,ax3),(ax4,ax5,ax6)) = plt.subplots(2,3,figsize=(16,11),gridspec_kw={'hspace': 0.01, 'wspace': 0.01}, frameon=False)
         ax1.imshow(rgb[sly, slx],origin='lower')
