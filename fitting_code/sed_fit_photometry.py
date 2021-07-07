@@ -320,6 +320,31 @@ def fit_photometry(target,master_table,REDSHIFT,x0,y0,size,mw_ebv,ha_line_filter
                 chi2_grid[j,k,i]=chisq
                 Av_full = np.append(Av_i,Av_line)
                 Av_full_grid[j,k,i,:]=Av_full
+                  
+                
+                _A = (_tempfilt.T/sys_err).T
+                _y = flux/sys_err
+
+                BOUNDED_DEFAULTS = {'method': 'bvls', 'tol': 1.e-8, 'verbose': 0}
+                LINE_BOUNDS = [-6.e3, 6.e5] #uJy 
+                bounded_kwargs = BOUNDED_DEFAULTS
+
+                NTEMP = len(all_templates)
+
+                lower_bound = np.zeros(NTEMP)
+                upper_bound = np.ones(NTEMP)*np.inf
+
+                lower_bound[:-1] = 0.
+                lower_bound[-1] = -1.e+18 #LINE_BOUNDS[0]
+                upper_bound[:-1] = 1.e+30
+                upper_bound[-1] = 1.e+30 #LINE_BOUNDS[1]
+
+                  # Bounded Least Squares
+                func = scipy.optimize.lsq_linear
+                bounds = (lower_bound, upper_bound)
+                lsq_out = func(_A, _y, bounds=bounds, **bounded_kwargs)
+                _coeffs = lsq_out.x
+                coeffs_grid[j,k,i,:]=_coeffs
     
     # Get best fit coefficients
     chi2_bestindex_cont = np.argmin(chi2_grid,axis=0)
