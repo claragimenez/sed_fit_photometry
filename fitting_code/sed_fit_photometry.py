@@ -383,7 +383,7 @@ def fit_catalog(target='galaxy',catalog='catalog.fits',template_files=None, temp
     self.efnu = np.sqrt(self.efnu_orig**2+(self.param['SYS_ERR']*self.fnu)**2)
 
     if template_params_file is None:
-        templ_params_file = 'templates/hr_sfhz_13.param.fits'
+        templ_params_file = 'templates/hr_sfhz_13_c3k.param.fits'
     else:
         templ_params_file = template_params_file
 
